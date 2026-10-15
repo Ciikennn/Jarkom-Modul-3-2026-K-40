@@ -1,517 +1,475 @@
-# Jarkom-Modul-3-2026-K-40
+# Jarkom-Modul-2-2026-K-40
 
-## Kelompok: K-40
+Laporan konfigurasi **DHCP Server & DHCP Relay** menggunakan GNS3, dengan Router **Jichi**, DHCP Server **Tengen**, dan client **alpinet** yang mendapat IP secara dinamis.
 
+Prefix IP yang digunakan: `192.231.x.x`
+
+| Interface Jichi | Subnet         | Node                                                                |
+| --------------- | -------------- | ------------------------------------------------------------------- |
+| eth0            | DHCP           | Internet Publik (NAT GNS3)                                          |
+| eth1            | 192.231.1.0/24 | Utahime, Shoko, Gojo                                                |
+| eth2            | 192.231.2.0/24 | Itadori, Fushiguro, Zenin, Okkotsu (Divisi A - DHCP)                |
+| eth3            | 192.231.3.0/24 | Ino, Kusakabe, Miwa, Kugisaki (Divisi B - DHCP)                     |
+| eth4            | 192.231.4.0/24 | Tengen, Geto, Maki, Panda, Nanami, Todo, Kirara, Yaga, Inumaki      |
 
 ---
 
-## SOAL 1: Konfigurasi IP & Routing
+## 1. Topologi, Forwarding & NAT
 
+![topologi](images/topologi.png)
 
-### Kode:
-```bash
+### Konfigurasi IP (`/etc/network/interfaces` / Edit config GNS3)
+
+**Router Jichi**
+
+```
+auto eth0
+iface eth0 inet dhcp
+
+auto eth1
+iface eth1 inet static
+    address 192.231.1.1
+    netmask 255.255.255.0
+
+auto eth2
+iface eth2 inet static
+    address 192.231.2.1
+    netmask 255.255.255.0
+
+auto eth3
+iface eth3 inet static
+    address 192.231.3.1
+    netmask 255.255.255.0
+
+auto eth4
+iface eth4 inet static
+    address 192.231.4.1
+    netmask 255.255.255.0
+```
+
+**Host statis** (contoh Tengen, ganti `address` & `gateway` sesuai tabel di bawah)
+
+```
+auto eth0
+iface eth0 inet static
+    address 192.231.4.10
+    netmask 255.255.255.0
+    gateway 192.231.4.1
+```
+
+| Node    | IP           | Node    | IP           |
+| ------- | ------------ | ------- | ------------ |
+| Utahime | 192.231.1.2  | Panda   | 192.231.4.32 |
+| Shoko   | 192.231.1.3  | Nanami  | 192.231.4.41 |
+| Gojo    | 192.231.1.4  | Todo    | 192.231.4.42 |
+| Tengen  | 192.231.4.10 | Kirara  | 192.231.4.43 |
+| Geto    | 192.231.4.20 | Yaga    | 192.231.4.51 |
+| Maki    | 192.231.4.31 | Inumaki | 192.231.4.52 |
+
+**Client alpinet** (8 client, isinya sama)
+
+```
+auto eth0
+iface eth0 inet dhcp
+```
+
+> Isi juga di menu **Edit config** GNS3, karena file ini ditulis ulang setiap node di-Start.
+
+Aktifkan forwarding dan NAT di **Jichi**:
+
+```
 sysctl -w net.ipv4.ip_forward=1
-iptables -t nat -F
+echo "net.ipv4.ip_forward=1" > /etc/sysctl.d/99-forward.conf
 iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
 ```
 
-### Cara Cek:
-```bash
-cat /proc/sys/net/ipv4/ip_forward
+Set DNS sementara di host statis:
+
+```
+echo "nameserver 192.168.122.1" > /etc/resolv.conf
 ```
 
-### Hasil Benar:
-```
-1
-```
+**Verifikasi:** dari host statis jalankan `ping -c 2 <gateway>` dan `ping -c 2 8.8.8.8`, harus dapat balasan.
 
-### Status: ✅ SELESAI
+![no1](images/no1.png)
 
 ---
 
-## SOAL 2: Install DHCP Server
+## 2. DHCP Server di Tengen
 
-| Item | Detail |
-|------|--------|
-| **Node** | tengen |
-| **Deskripsi** | Install dan konfigurasi isc-dhcp-server |
+```
+apt-get update && apt-get install -y isc-dhcp-server
+echo 'INTERFACESv4="eth0"' > /etc/default/isc-dhcp-server
+```
 
-### Kode:
-```bash
-apt-get update
-apt-get install -y isc-dhcp-server
+Isi `/etc/dhcp/dhcpd.conf` (versi dasar, dipecah jadi pool di soal 4-5):
 
-cat > /etc/default/isc-dhcp-server <<EOF
-INTERFACESv4="eth0"
-EOF
+```
+authoritative;
+option domain-name "k40.com";
+option domain-name-servers 192.231.1.2, 192.231.1.3;
+option domain-search "k40.com";
+default-lease-time 600;
+max-lease-time 7200;
 
-cat > /etc/dhcp/dhcpd.conf <<EOF
 subnet 192.231.4.0 netmask 255.255.255.0 {
+}
+
+subnet 192.231.2.0 netmask 255.255.255.0 {
+    option routers 192.231.2.1;
+    option broadcast-address 192.231.2.255;
+    range 192.231.2.10 192.231.2.35;
+}
+
+subnet 192.231.3.0 netmask 255.255.255.0 {
+    option routers 192.231.3.1;
+    option broadcast-address 192.231.3.255;
+    range 192.231.3.10 192.231.3.89;
+}
+```
+
+> Subnet `192.231.4.0` (tanpa range) wajib ada agar dhcpd tidak error `No subnet declaration`.
+
+```
+touch /var/lib/dhcp/dhcpd.leases
+dhcpd -t -cf /etc/dhcp/dhcpd.conf
+service isc-dhcp-server restart
+```
+
+**Verifikasi:** `service isc-dhcp-server status` harus `running`.
+
+![no2](images/no2.png)
+
+---
+
+## 3. DHCP Relay di Jichi
+
+```
+apt-get update && apt-get install -y isc-dhcp-relay
+```
+
+Isi `/etc/default/isc-dhcp-relay`:
+
+```
+SERVERS="192.231.4.10"
+INTERFACES="eth2 eth3 eth4"
+OPTIONS=""
+```
+
+> `eth2` & `eth3` = sisi client, `eth4` = sisi Tengen (agar balasan server ikut diteruskan).
+
+```
+service isc-dhcp-relay restart
+```
+
+Di **setiap client**, buat script untuk meminta lease:
+
+```
+cat << 'EOF' > /root/client_dhcp.sh
+#!/bin/sh
+pkill udhcpc 2>/dev/null
+ip addr flush dev eth0
+ip link set eth0 up
+udhcpc -i eth0 -n -q -t 5 -T 2 -x hostname:$(hostname)
+ip -4 addr show eth0 | grep inet
+ip route
+cat /etc/resolv.conf
+EOF
+chmod +x /root/client_dhcp.sh
+sh /root/client_dhcp.sh
+```
+
+**Verifikasi:** `pgrep -a dhcrelay` di Jichi harus muncul, dan client menampilkan `lease of 192.231.x.x obtained from 192.231.4.10`.
+
+![no3](images/no3.png)
+
+---
+
+## 4. Pool Berbasis MAC (Divisi A)
+
+| Pool   | Client             | Range               |
+| ------ | ------------------ | ------------------- |
+| Pool 1 | Itadori, Fushiguro | 192.231.2.10 - .35  |
+| Pool 2 | Zenin, Okkotsu     | 192.231.2.70 - .95  |
+| -      | (tidak dialokasikan) | 192.231.2.36 - .69 |
+
+Cek MAC tiap client dengan `ip link show eth0 | grep ether`, lalu tambahkan di `/etc/dhcp/dhcpd.conf` Tengen:
+
+```
+class "pool1" {
+    match if substring(hardware, 1, 6) = 02:42:e2:07:da:00
+          or substring(hardware, 1, 6) = 02:42:46:07:2d:00;
+}
+class "pool2" {
+    match if substring(hardware, 1, 6) = 02:42:cb:b2:d2:00
+          or substring(hardware, 1, 6) = 02:42:fb:4c:da:00;
+}
+
+subnet 192.231.2.0 netmask 255.255.255.0 {
+    option routers 192.231.2.1;
+    option broadcast-address 192.231.2.255;
     pool {
-        range 192.231.4.200 192.231.4.210;
-        deny unknown-clients;
+        allow members of "pool1";
+        range 192.231.2.10 192.231.2.35;
+    }
+    pool {
+        allow members of "pool2";
+        range 192.231.2.70 192.231.2.95;
     }
 }
-EOF
-
-ip route del default 2>/dev/null
-ip route add default via 192.231.4.1
-echo "nameserver 8.8.8.8" > /etc/resolv.conf
-
-service isc-dhcp-server restart
-update-rc.d isc-dhcp-server defaults
 ```
 
-### Cara Cek:
-```bash
-service isc-dhcp-server status
+```
+dhcpd -t -cf /etc/dhcp/dhcpd.conf && service isc-dhcp-server restart
 ```
 
-### Hasil Benar:
+Jalankan `sh /root/client_dhcp.sh` di keempat client.
+
+**Verifikasi** di Tengen:
+
 ```
-Status of ISC DHCPv4 server: dhcpd is running.
+grep -E "^lease|hardware ethernet|client-hostname" /var/lib/dhcp/dhcpd.leases
 ```
 
-### Status: ✅ SELESAI
+![no4](images/no4.png)
 
 ---
 
-## SOAL 3: Konfigurasi DHCP Relay
+## 5. Short Lease & Long Lease (Divisi B)
 
-| Item | Detail |
-|------|--------|
-| **Node** | jichi |
-| **Deskripsi** | Konfigurasi DHCP Relay ke tengen |
+| Pool       | Client        | Range                | Lease               |
+| ---------- | ------------- | -------------------- | ------------------- |
+| Short      | Ino, Kusakabe | 192.231.3.10 - .89   | 1800 detik (30 menit) |
+| Long       | Miwa          | 192.231.3.100 - .199 | 43200 detik (12 jam)  |
 
-### Kode:
-```bash
-apt-get update
-apt-get install -y isc-dhcp-relay
+Tambahkan class dan ganti blok subnet `192.231.3.0` di `/etc/dhcp/dhcpd.conf` Tengen (isi MAC sesuai client masing-masing):
 
-cat > /etc/default/isc-dhcp-relay <<EOF
-SERVERS="192.231.4.10"
-INTERFACES="eth2 eth3"
-OPTIONS=""
-EOF
-
-service isc-dhcp-relay restart
-update-rc.d isc-dhcp-relay defaults
 ```
-
-### Cara Cek:
-```bash
-ps aux | grep dhcrelay
-service isc-dhcp-relay status
-```
-
-### Hasil Benar:
-```
-root    xxx   0.0  /usr/sbin/dhcrelay -q -i eth2 -i eth3 192.231.4.10
-```
-
-### Status: ✅ SELESAI
-
----
-
-## SOAL 4: DHCP Pool 1 & Pool 2
-
-| Item | Detail |
-|------|--------|
-| **Node** | tengen |
-| **Deskripsi** | Konfigurasi 2 pool DHCP untuk Divisi A |
-
-### Kode:
-```bash
-cat > /etc/dhcp/dhcpd.conf <<'EOF'
-option domain-name "jujutsu.k40.com";
-option domain-name-servers 192.231.1.2, 192.231.1.3;
-
-subnet 192.231.4.0 netmask 255.255.255.0 {
+class "short-lease" {
+    match if substring(hardware, 1, 6) = 02:42:c7:7f:09:00
+          or substring(hardware, 1, 6) = <MAC_KUSAKABE>;
 }
-
-subnet 192.231.2.0 netmask 255.255.255.0 {
-    option routers 192.231.2.1;
-    option subnet-mask 255.255.255.0;
-    option broadcast-address 192.231.2.255;
-    option domain-name-servers 192.231.1.2, 192.231.1.3;
-    option domain-search "jujutsu.k40.com";
-    pool { range 192.231.2.10 192.231.2.35; }
-    pool { range 192.231.2.70 192.231.2.95; }
+class "long-lease" {
+    match if substring(hardware, 1, 6) = <MAC_MIWA>;
 }
 
 subnet 192.231.3.0 netmask 255.255.255.0 {
     option routers 192.231.3.1;
-    option subnet-mask 255.255.255.0;
     option broadcast-address 192.231.3.255;
-}
-EOF
-
-service isc-dhcp-server restart
-```
-
-### Cara Cek:
-```bash
-dhcpd -t -cf /etc/dhcp/dhcpd.conf
-service isc-dhcp-server status
-```
-
-### Hasil Benar:
-```
-No error, dhcpd is running
-```
-
-### Status: ✅ SELESAI
-
----
-
-## SOAL 5: Short Lease & Long Lease
-
-| Item | Detail |
-|------|--------|
-| **Node** | tengen |
-| **Deskripsi** | Konfigurasi lease time berbeda untuk Divisi B |
-
-### Kode:
-```bash
-cat > /etc/dhcp/dhcpd.conf <<'EOF'
-option domain-name "jujutsu.k40.com";
-option domain-name-servers 192.231.1.2, 192.231.1.3;
-
-subnet 192.231.4.0 netmask 255.255.255.0 {
-}
-
-subnet 192.231.2.0 netmask 255.255.255.0 {
-    option routers 192.231.2.1;
-    option subnet-mask 255.255.255.0;
-    option broadcast-address 192.231.2.255;
-    option domain-name-servers 192.231.1.2, 192.231.1.3;
-    option domain-search "jujutsu.k40.com";
-    pool { range 192.231.2.10 192.231.2.35; }
-    pool { range 192.231.2.70 192.231.2.95; }
-}
-
-subnet 192.231.3.0 netmask 255.255.255.0 {
-    option routers 192.231.3.1;
-    option subnet-mask 255.255.255.0;
-    option broadcast-address 192.231.3.255;
-    option domain-name-servers 192.231.1.2, 192.231.1.3;
-    option domain-search "jujutsu.k40.com";
-    pool { range 192.231.3.10 192.231.3.89; default-lease-time 1800; max-lease-time 1800; }
-    pool { range 192.231.3.100 192.231.3.199; default-lease-time 43200; max-lease-time 43200; }
-}
-EOF
-
-service isc-dhcp-server restart
-```
-
-### Cara Cek:
-```bash
-grep -E "lease-time" /etc/dhcp/dhcpd.conf
-```
-
-### Hasil Benar:
-```
-default-lease-time 1800;
-max-lease-time 1800;
-default-lease-time 43200;
-max-lease-time 43200;
-```
-
-### Status: ✅ SELESAI
-
----
-
-## SOAL 6: Fixed Address Kugisaki
-
-| Item | Detail |
-|------|--------|
-| **Node** | tengen |
-| **Deskripsi** | Konfigurasi fixed IP untuk kugisaki |
-
-### Kode:
-```bash
-cat > /etc/dhcp/dhcpd.conf <<'EOF'
-option domain-name "jujutsu.k40.com";
-option domain-name-servers 192.231.1.2, 192.231.1.3;
-
-subnet 192.231.4.0 netmask 255.255.255.0 {
-}
-
-subnet 192.231.2.0 netmask 255.255.255.0 {
-    option routers 192.231.2.1;
-    option subnet-mask 255.255.255.0;
-    option broadcast-address 192.231.2.255;
-    option domain-name-servers 192.231.1.2, 192.231.1.3;
-    option domain-search "jujutsu.k40.com";
-    pool { range 192.231.2.10 192.231.2.35; }
-    pool { range 192.231.2.70 192.231.2.95; }
-}
-
-subnet 192.231.3.0 netmask 255.255.255.0 {
-    option routers 192.231.3.1;
-    option subnet-mask 255.255.255.0;
-    option broadcast-address 192.231.3.255;
-    option domain-name-servers 192.231.1.2, 192.231.1.3;
-    option domain-search "jujutsu.k40.com";
-
-    host kugisaki {
-        hardware ethernet 02:42:ac:11:00:99;
-        fixed-address 192.231.3.99;
+    pool {
+        allow members of "short-lease";
+        range 192.231.3.10 192.231.3.89;
+        default-lease-time 1800;
+        max-lease-time 1800;
+    }
+    pool {
+        allow members of "long-lease";
+        range 192.231.3.100 192.231.3.199;
         default-lease-time 43200;
         max-lease-time 43200;
     }
-
-    pool { range 192.231.3.10 192.231.3.89; default-lease-time 1800; max-lease-time 1800; }
-    pool { range 192.231.3.100 192.231.3.199; default-lease-time 43200; max-lease-time 43200; }
 }
-EOF
-
-service isc-dhcp-server restart
 ```
 
-### Cara Cek:
-```bash
-grep -A5 "host kugisaki" /etc/dhcp/dhcpd.conf
+```
+dhcpd -t -cf /etc/dhcp/dhcpd.conf && service isc-dhcp-server restart
 ```
 
-### Hasil Benar:
+**Verifikasi:** jalankan `sh /root/client_dhcp.sh` di Ino, Kusakabe, dan Miwa. Output `udhcpc` menampilkan `lease time 1800` (Ino, Kusakabe) dan `lease time 43200` (Miwa).
+
+![no5](images/no5.png)
+
+---
+
+## 6. Fixed Address Kugisaki
+
+Tambahkan di akhir `/etc/dhcp/dhcpd.conf` Tengen:
+
 ```
 host kugisaki {
-    hardware ethernet 02:42:ac:11:00:99;
+    hardware ethernet 02:42:a8:e3:32:00;
     fixed-address 192.231.3.99;
-    default-lease-time 43200;
-    max-lease-time 43200;
 }
 ```
 
-### Status: ✅ SELESAI
+> `.99` berada di luar pool short (`.10-.89`) dan pool long (`.100-.199`), jadi tidak bentrok.
+
+```
+dhcpd -t -cf /etc/dhcp/dhcpd.conf && service isc-dhcp-server restart
+```
+
+**Verifikasi:** jalankan `sh /root/client_dhcp.sh` di Kugisaki dua kali, IP harus selalu `192.231.3.99` dengan gateway `192.231.3.1`.
+
+![no6](images/no6.png)
 
 ---
 
-## SOAL 7: Validasi Konfigurasi
+## 7. Validasi Konfigurasi Client & Lease
 
-| Item | Detail |
-|------|--------|
-| **Node** | tengen |
-| **Deskripsi** | Validasi semua konfigurasi DHCP |
+Di **setiap client**:
 
-### Kode:
-```bash
-cat /etc/dhcp/dhcpd.conf
+```
+sh /root/client_dhcp.sh
 ```
 
-### Cara Cek:
-```bash
-dhcpd -t -cf /etc/dhcp/dhcpd.conf
-service isc-dhcp-server status
+| Client             | IP                   | Gateway     | Broadcast     |
+| ------------------ | -------------------- | ----------- | ------------- |
+| Itadori, Fushiguro | 192.231.2.10 - .35   | 192.231.2.1 | 192.231.2.255 |
+| Zenin, Okkotsu     | 192.231.2.70 - .95   | 192.231.2.1 | 192.231.2.255 |
+| Ino, Kusakabe      | 192.231.3.10 - .89   | 192.231.3.1 | 192.231.3.255 |
+| Miwa               | 192.231.3.100 - .199 | 192.231.3.1 | 192.231.3.255 |
+| Kugisaki           | 192.231.3.99 (fixed) | 192.231.3.1 | 192.231.3.255 |
+
+Semua client harus mendapat netmask `/24`, DNS `192.231.1.2` & `192.231.1.3`, dan `search k40.com` di `/etc/resolv.conf`.
+
+Di **Tengen**, cocokkan dengan file lease:
+
+```
+grep -E "^lease|starts|ends|hardware ethernet|client-hostname|binding state" /var/lib/dhcp/dhcpd.leases
 ```
 
-### Checklist Hasil:
+**Verifikasi:**
 
-| Item | Expected | Status |
-|------|----------|--------|
-| Domain | jujutsu.k40.com | ✅ |
-| DNS | 192.231.1.2, 192.231.1.3 | ✅ |
-| Pool 1 (Net2) | 192.231.2.10-35 | ✅ |
-| Pool 2 (Net2) | 192.231.2.70-95 | ✅ |
-| Gateway Net2 | 192.231.2.1 | ✅ |
-| Gateway Net3 | 192.231.3.1 | ✅ |
-| Short Lease | 192.231.3.10-89, 1800s | ✅ |
-| Long Lease | 192.231.3.100-199, 43200s | ✅ |
-| Fixed (kugisaki) | 192.231.3.99 | ✅ |
+- 7 lease aktif (semua client kecuali Kugisaki)
+- Tidak ada IP/MAC dobel dan tidak ada lease di range `192.231.2.36 - .69`
+- Kugisaki tidak muncul di `dhcpd.leases` (normal untuk `fixed-address`)
 
-### Status: ✅ SELESAI
+![no7](images/no7.png)
 
 ---
 
-## SOAL 8: Packet Capture DHCP
+## 8. Packet Capture DHCP (DORA + giaddr)
 
-| Item | Detail |
-|------|--------|
-| **Node** | tengen, jichi, client |
-| **Deskripsi** | Capture packet DHCP untuk verifikasi |
+Di **Tengen**, mulai capture 40 detik:
 
-### Kode - tengen:
-```bash
-apt-get update
+```
 apt-get install -y tcpdump
-tcpdump -i eth0 port 67 or port 68 -v
+timeout 40 tcpdump -i eth0 -n -vv -w /root/dhcp_net3.pcap 'udp port 67 or udp port 68'
 ```
 
-### Kode - jichi:
-```bash
-tcpdump -i eth2 port 67 or port 68 -v
+Dalam 40 detik tersebut, di **Ino** jalankan:
+
+```
+sh /root/client_dhcp.sh
 ```
 
-### Kode - client:
-```bash
-ip addr flush dev eth0
-ip addr add 192.231.2.10/24 dev eth0
-ip link set eth0 up
-ip route add default via 192.231.2.1
+Baca hasil capture (difilter berdasarkan MAC Ino):
+
+```
+tcpdump -n -vv -r /root/dhcp_net3.pcap 'udp[36:4]=0x0242c77f and udp[40:2]=0x0900' 2>/dev/null \
+  | grep -E "DHCP-Message|Gateway-IP|Your-IP|Server-ID|Lease-Time"
 ```
 
-### Cara Cek:
-Lihat output tcpdump
+| Yang dicari        | Hasil                                                    |
+| ------------------ | -------------------------------------------------------- |
+| Urutan             | `Discover` → `Offer` → `Request` → `ACK`                 |
+| Alamat server      | `Server-ID 192.231.4.10`                                 |
+| Alamat diberikan   | `Your-IP 192.231.3.x`                                    |
+| Lease time         | `Lease-Time 1800`                                        |
+| giaddr             | `Gateway-IP 192.231.3.1` (interface eth3 Jichi)          |
 
-### Hasil Benar:
-```
-DHCPDISCOVER     ← client broadcast mencari server
-DHCPOFFER        ← server menawarkan IP
-DHCPREQUEST      ← client meminta IP
-DHCPACK          ← server konfirmasi IP
-```
-
-### Status: ✅ SELESAI
+![no8](images/no8.png)
 
 ---
 
-## SOAL 9: Gangguan & Recovery DHCP Relay
+## 9. Simulasi Gangguan DHCP Relay
 
-| Item | Detail |
-|------|--------|
-| **Node** | jichi |
-| **Deskripsi** | Simulasi gangguan dan recovery relay |
+Matikan relay di **Jichi**:
 
-### Kode:
-```bash
-# Stop Relay
+```
 service isc-dhcp-relay stop
-
-# Cek gejala (client tidak dapat IP)
-
-# Start Relay lagi
-service isc-dhcp-relay start
+pkill dhcrelay
 ```
 
-### Cara Cek:
-```bash
-service isc-dhcp-relay status
+Di **Itadori**, minta lease baru:
+
+```
+pkill udhcpc; ip addr flush dev eth0
+udhcpc -i eth0 -n -q -t 3 -T 2
+ip -4 addr show eth0
 ```
 
-### Hasil Benar:
+| Lokasi       | Gejala                                                     |
+| ------------ | ---------------------------------------------------------- |
+| Itadori      | `no lease, failing`, eth0 tidak punya IP & default route   |
+| Tengen       | `tcpdump -i eth0` tidak menangkap paket DHCP sama sekali   |
+| Jichi (eth2) | DISCOVER dari client terlihat, tetapi tidak ada OFFER      |
+
+Pulihkan relay di **Jichi**:
+
 ```
-# Saat STOP: relay tidak berjalan
-# Saat START: relay berjalan dengan eth2, eth3 forwarding ke 192.231.4.10
+service isc-dhcp-relay restart
+pgrep -a dhcrelay
 ```
 
-### Status: ✅ SELESAI
+**Verifikasi:** jalankan `sh /root/client_dhcp.sh` di Itadori, harus kembali dapat IP di Pool 1 (`192.231.2.10 - .35`) dengan gateway `192.231.2.1`.
+
+![no9](images/no9.png)
 
 ---
 
-## SOAL 10: Autostart Services
+## 10. Autostart & Uji Restart
 
-| Item | Detail |
-|------|--------|
-| **Node** | jichi, tengen |
-| **Deskripsi** | Setup autostart service setelah reboot |
+Di **Tengen**, buat script start dan autostart:
 
-### Kode - jichi:
-```bash
-echo "net.ipv4.ip_forward=1" > /etc/sysctl.d/99-ipforward.conf
-sysctl -w net.ipv4.ip_forward=1
-
-cat > /etc/init.d/autostart-nat.sh <<'EOF'
+```
+cat << 'EOF' > /root/start_services.sh
 #!/bin/bash
-iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+ip route replace default via 192.231.4.1
+touch /var/lib/dhcp/dhcpd.leases
+rm -f /var/run/dhcpd.pid
+service isc-dhcp-server restart
 EOF
-chmod +x /etc/init.d/autostart-nat.sh
-bash /etc/init.d/autostart-nat.sh
+chmod +x /root/start_services.sh
 
-update-rc.d autostart-nat.sh defaults
-update-rc.d isc-dhcp-relay defaults
-```
-
-### Kode - tengen:
-```bash
 update-rc.d isc-dhcp-server defaults
+
+cat << 'EOF' > /root/init.sh
+#!/bin/sh
+( sleep 10; /root/start_services.sh > /root/start_services.log 2>&1 ) &
+EOF
+chmod +x /root/init.sh
 ```
 
-### Cara Cek:
-```bash
-# Cek di jichi
-cat /proc/sys/net/ipv4/ip_forward
-iptables -t nat -L POSTROUTING -v -n
-ls -la /etc/rc*.d/*dhcp*
-
-# Cek di tengen
-service isc-dhcp-server status
-ls -la /etc/rc*.d/*dhcp*
-```
-
-### Hasil Benar:
-```
-IP Forward: 1
-NAT MASQUERADE: Ada rule
-Service: running
-Autostart Links: rc0-rc6 ada
-```
-
-### Status: ✅ SELESAI
-
----
-
-## TABEL RINGKASAN
-
-| No | Node | Fungsi | Status |
-|----|------|--------|--------|
-| 1 | jichi | IP Forward + NAT | ✅ |
-| 2 | tengen | DHCP Server | ✅ |
-| 3 | jichi | DHCP Relay | ✅ |
-| 4 | tengen | Pool 1 & 2 | ✅ |
-| 5 | tengen | Short/Long Lease | ✅ |
-| 6 | tengen | Fixed Address | ✅ |
-| 7 | tengen | Validasi | ✅ |
-| 8 | All | Packet Capture | ✅ |
-| 9 | jichi | Gangguan/Recovery | ✅ |
-| 10 | All | Autostart | ✅ |
-
----
-
-## TOPOLOGI JARINGAN
+Di **Jichi**:
 
 ```
-INTERNET
-    |
-   NAT
-    |
-    | eth0 (DHCP)
-    |
-  [jichi]  ← Router & DHCP Relay
-    |
-    ├─ eth1 ── [Switch-1] ── utahime (.1.2), shoko (.1.3), gojo (.1.10)
-    │
-    ├─ eth2 ── [Switch-2] ── itadori, fushiguro, zenin, okkotsu (DHCP)
-    │
-    ├─ eth3 ── [Switch-4] ── ino, kusakabe, miwa, kugisaki (DHCP)
-    │
-    └─ eth4 ── [Switch-6] ── tengen (.4.10), geto (.4.20), dll
+cat << 'EOF' > /root/start_services.sh
+#!/bin/bash
+sysctl -w net.ipv4.ip_forward=1
+iptables -t nat -F
+iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+rm -f /var/run/dhcrelay.pid
+service isc-dhcp-relay restart
+EOF
+chmod +x /root/start_services.sh
+
+update-rc.d isc-dhcp-relay defaults
+
+cat << 'EOF' > /root/init.sh
+#!/bin/sh
+( sleep 15; /root/start_services.sh > /root/start_services.log 2>&1 ) &
+EOF
+chmod +x /root/init.sh
 ```
 
----
+> Container debinet menjalankan `/root/init.sh` otomatis setiap node di-Start, sehingga service ikut hidup setelah restart.
 
-## TABEL IP
+Di GNS3: **Stop** lalu **Start** Tengen dan Jichi, tunggu ±30 detik.
 
-| Node | IP | Keterangan |
-|------|-----|------------|
-| jichi | eth1: 192.231.1.1, eth2: 192.231.2.1, eth3: 192.231.3.1, eth4: 192.231.4.1 | Router |
-| tengen | 192.231.4.10 | DHCP Server |
-| utahime | 192.231.1.2 | DNS Master |
-| shoko | 192.231.1.3 | DNS Slave |
-| gojo | 192.231.1.10 | Reverse Proxy |
-| geto | 192.231.4.20 | Load Balancer |
-| yaga | 192.231.4.51 | DB Master |
-| inumaki | 192.231.4.52 | DB Slave |
-| itadori | DHCP Pool 1 (192.231.2.10-35) | Client |
-| fushiguro | DHCP Pool 1 (192.231.2.10-35) | Client |
-| zenin | DHCP Pool 2 (192.231.2.70-95) | Client |
-| okkotsu | DHCP Pool 2 (192.231.2.70-95) | Client |
-| ino | DHCP Short Lease (192.231.3.10-89, 1800s) | Client |
-| kusakabe | DHCP Short Lease (192.231.3.10-89, 1800s) | Client |
-| miwa | DHCP Long Lease (192.231.3.100-199, 43200s) | Client |
-| kugisaki | Fixed Address (192.231.3.99) | Client VIP |
+**Verifikasi:**
 
----
+```
+# Tengen
+pgrep -a dhcpd
+# Jichi
+pgrep -a dhcrelay
+iptables -t nat -L POSTROUTING -n
+# Setiap client
+sh /root/client_dhcp.sh
+ping -c 2 192.231.4.10
+```
 
-**Laporan dibuat: 2026-10-13**
-**Kelompok: K-40**
+Semua client harus kembali mendapat IP sesuai pool masing-masing (Pool 1, Pool 2, short lease, long lease, dan fixed address Kugisaki).
+
+![no10](images/no10.png)
