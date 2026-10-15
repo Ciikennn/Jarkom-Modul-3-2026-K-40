@@ -1,4 +1,4 @@
-# Jarkom-Modul-2-2026-K-40
+# Jarkom-Modul-3-2026-K-40
 
 Laporan konfigurasi **DHCP Server & DHCP Relay** menggunakan GNS3, dengan Router **Jichi**, DHCP Server **Tengen**, dan client **alpinet** yang mendapat IP secara dinamis.
 
