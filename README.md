@@ -91,7 +91,7 @@ echo "nameserver 192.168.122.1" > /etc/resolv.conf
 
 **Verifikasi:** dari host statis jalankan `ping -c 2 <gateway>` dan `ping -c 2 8.8.8.8`, harus dapat balasan.
 
-![no1](images/no1.png)
+![no1](images/jarkom3no1.png)
 
 ---
 
@@ -138,7 +138,7 @@ service isc-dhcp-server restart
 
 **Verifikasi:** `service isc-dhcp-server status` harus `running`.
 
-![no2](images/no2.png)
+![no2](images/jarkom3no2.png)
 
 ---
 
@@ -181,7 +181,7 @@ sh /root/client_dhcp.sh
 
 **Verifikasi:** `pgrep -a dhcrelay` di Jichi harus muncul, dan client menampilkan `lease of 192.231.x.x obtained from 192.231.4.10`.
 
-![no3](images/no3.png)
+![no2](images/jarkom3no3.png)
 
 ---
 
@@ -231,7 +231,7 @@ Jalankan `sh /root/client_dhcp.sh` di keempat client.
 grep -E "^lease|hardware ethernet|client-hostname" /var/lib/dhcp/dhcpd.leases
 ```
 
-![no4](images/no4.png)
+![no2](images/jarkom3no4.png)
 
 ---
 
@@ -277,7 +277,7 @@ dhcpd -t -cf /etc/dhcp/dhcpd.conf && service isc-dhcp-server restart
 
 **Verifikasi:** jalankan `sh /root/client_dhcp.sh` di Ino, Kusakabe, dan Miwa. Output `udhcpc` menampilkan `lease time 1800` (Ino, Kusakabe) dan `lease time 43200` (Miwa).
 
-![no5](images/no5.png)
+![no2](images/jarkom3no5.png)
 
 ---
 
@@ -300,7 +300,7 @@ dhcpd -t -cf /etc/dhcp/dhcpd.conf && service isc-dhcp-server restart
 
 **Verifikasi:** jalankan `sh /root/client_dhcp.sh` di Kugisaki dua kali, IP harus selalu `192.231.3.99` dengan gateway `192.231.3.1`.
 
-![no6](images/no6.png)
+![no2](images/jarkom3no6.png)
 
 ---
 
@@ -334,7 +334,7 @@ grep -E "^lease|starts|ends|hardware ethernet|client-hostname|binding state" /va
 - Tidak ada IP/MAC dobel dan tidak ada lease di range `192.231.2.36 - .69`
 - Kugisaki tidak muncul di `dhcpd.leases` (normal untuk `fixed-address`)
 
-![no7](images/no7.png)
+![no2](images/jarkom2no7.png)
 
 ---
 
@@ -368,7 +368,7 @@ tcpdump -n -vv -r /root/dhcp_net3.pcap 'udp[36:4]=0x0242c77f and udp[40:2]=0x090
 | Lease time         | `Lease-Time 1800`                                        |
 | giaddr             | `Gateway-IP 192.231.3.1` (interface eth3 Jichi)          |
 
-![no8](images/no8.png)
+![no2](images/jarkom3no8.png)
 
 ---
 
@@ -404,7 +404,7 @@ pgrep -a dhcrelay
 
 **Verifikasi:** jalankan `sh /root/client_dhcp.sh` di Itadori, harus kembali dapat IP di Pool 1 (`192.231.2.10 - .35`) dengan gateway `192.231.2.1`.
 
-![no9](images/no9.png)
+![no2](images/jarkom3no9.png)
 
 ---
 
