@@ -14,9 +14,6 @@ Prefix IP yang digunakan: `192.231.x.x`
 
 ---
 
-## 1. Topologi, Forwarding & NAT
-
-![topologi](images/topologi.png)
 
 ### Konfigurasi IP (`/etc/network/interfaces` / Edit config GNS3)
 
