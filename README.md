@@ -542,7 +542,7 @@ chmod +x /root/soal_11_slave.sh
 ```
 
 **Pengujian:**
-Dijalankan pada node **Client** (misalnya `kusakabe` atau node lain yang memiliki `dnsutils`):
+Dijalankan pada node **Client** (misalnya `ino` atau node lain yang memiliki `dnsutils`):
 ```bash
 dig @192.231.1.2 jujutsu.k40.com SOA +short
 dig @192.231.1.3 jujutsu.k40.com SOA +short
@@ -632,7 +632,7 @@ chmod +x /root/soal_12.sh
 ```
 
 **Pengujian:**
-Dijalankan pada node **Client** (misalnya `kusakabe`):
+Dijalankan pada node **Client** (misalnya `ino`):
 ```bash
 # Pengaturan IP & Resolv Client
 ip addr flush dev eth0
