@@ -546,14 +546,14 @@ chmod +x /root/soal_11_slave.sh
 
 **Pengujian:**
 Dijalankan pada node **Client** (misalnya `kusakabe` atau node lain yang memiliki `dnsutils`):
-
 ```bash
 dig @192.231.1.2 jujutsu.k40.com SOA +short
 dig @192.231.1.3 jujutsu.k40.com SOA +short
 ```
 
-![Soal 11 1](screenshot/soal_11-1.png)
-![Soal 11 2](screenshot/soal_11-2.png)
+**Hasil:**
+![Soal 11 - 1](images/soal_11-1.png)
+![Soal 11 - 2](images/soal_11-2.png)
 
 
 ## Soal 12 - DNS CNAME, Reverse DNS, dan Forwarder
@@ -636,7 +636,6 @@ chmod +x /root/soal_12.sh
 
 **Pengujian:**
 Dijalankan pada node **Client** (misalnya `kusakabe`):
-
 ```bash
 # Pengaturan IP & Resolv Client
 ip addr flush dev eth0
@@ -655,9 +654,10 @@ dig jujutsu.k40.com
 dig -x 192.231.1.4
 ```
 
-![Soal 12 CNAME](screenshot/soal_12_cname.png)
-![Soal 12 DNS](screenshot/soal_12_dns.png)
-![Soal 12 Reverse](screenshot/soal_12_rvs.png)
+**Hasil:**
+![Soal 12 CNAME](images/soal_12_cname.png)
+![Soal 12 DNS](images/soal_12_dns.png)
+![Soal 12 Reverse](images/soal_12_rvs.png)
 
 
 ## Soal 13 - Database Master & Slave Replication
@@ -765,7 +765,6 @@ chmod +x /root/soal_13_slave.sh
 
 **Pengujian:**
 Dijalankan pada node **yaga** (Master) untuk melakukan insert, dan pada node **inumaki** (Slave) untuk melihat hasil replikasi:
-
 ```bash
 # Di node Yaga (Master)
 mysql -u root -e "USE db_shibuya_k40; INSERT INTO request_logs (worker_name, client_ip, proxy_ip) VALUES ('TEST_WORKER', '192.168.1.1', '10.0.0.1');"
@@ -774,8 +773,9 @@ mysql -u root -e "USE db_shibuya_k40; INSERT INTO request_logs (worker_name, cli
 mysql -u root -e "USE db_shibuya_k40; SELECT * FROM request_logs;"
 ```
 
-![Soal 13 Master](screenshot/soal_13_master.png)
-![Soal 13 Slave](screenshot/soal_13_slave.png)
+**Hasil:**
+![Soal 13 Master](images/soal_13_master.png)
+![Soal 13 Slave](images/soal_13_slave.png)
 
 
 ## Soal 14 - Web Frontend & API Worker
@@ -904,15 +904,15 @@ chmod +x /root/soal_14_api.sh
 
 **Pengujian:**
 Dijalankan pada node **Client** atau secara langsung dari router untuk melihat status akses (Forbidden/Akses Web):
-
 ```bash
 curl -i http://192.231.4.31/
 curl -i http://192.231.4.41/api/
 ```
 
-![Soal 14 Forbidden](screenshot/soal_14_forb.png)
-![Soal 14 Geto](screenshot/soal_14_geto.png)
-![Soal 14 Gojo](screenshot/soal_14_gojo.png)
+**Hasil:**
+![Soal 14 Forbidden](images/soal_14_forb.png)
+![Soal 14 Geto](images/soal_14_geto.png)
+![Soal 14 Gojo](images/soal_14_gojo.png)
 
 
 ## Soal 15 - API Load Balancer (`geto`)
@@ -956,13 +956,13 @@ chmod +x /root/soal_15.sh
 
 **Pengujian:**
 Dijalankan pada node **Client** (atau dari `gojo`):
-
 ```bash
 # Melakukan request berulang untuk melihat distribusi load balancer (3:1)
 for i in {1..4}; do curl -s http://192.231.4.20/api/ ; echo "" ; done
 ```
 
-![Soal 15](screenshot/soal_15.png)
+**Hasil:**
+![Soal 15](images/soal_15.png)
 
 
 ## Soal 16 - Main Reverse Proxy (`gojo`)
@@ -1011,7 +1011,6 @@ chmod +x /root/soal_16.sh
 
 **Pengujian:**
 Dijalankan pada node **Client**:
-
 ```bash
 # Menguji pembagian frontend
 for i in {1..4}; do curl -s http://jujutsu.k40.com/ | grep "Frontend"; done
@@ -1020,8 +1019,9 @@ for i in {1..4}; do curl -s http://jujutsu.k40.com/ | grep "Frontend"; done
 curl -s http://jujutsu.k40.com/api/
 ```
 
-![Soal 16 API](screenshot/soal_16_api.png)
-![Soal 16 Web](screenshot/soal_16_web.png)
+**Hasil:**
+![Soal 16 API](images/soal_16_api.png)
+![Soal 16 Web](images/soal_16_web.png)
 
 
 ## Soal 17 - Konfigurasi Real IP & Trust Proxy
@@ -1109,7 +1109,6 @@ chmod +x /root/soal_17_api.sh
 
 **Pengujian:**
 Dijalankan secara berurutan di sisi **Client** dan di database Master **yaga**:
-
 ```bash
 # Dijalankan pada node Client
 curl http://jujutsu.k40.com/api/
@@ -1118,8 +1117,9 @@ curl http://jujutsu.k40.com/api/
 mysql -u root -e "USE db_shibuya_k40; SELECT id, worker_name, client_ip, proxy_ip FROM request_logs;"
 ```
 
-![Soal 17 Client](screenshot/soal_17_client.png)
-![Soal 17 DB](screenshot/soal_17_db.png)
+**Hasil:**
+![Soal 17 Client](images/soal_17_client.png)
+![Soal 17 DB](images/soal_17_db.png)
 
 
 ## Soal 18 - Backup Server & Health Check
@@ -1166,12 +1166,12 @@ chmod +x /root/soal_18.sh
 
 **Pengujian:**
 Dijalankan pada node **Client** (setelah mematikan layanan nginx di node `nanami` dan `todo` untuk menguji *failover*):
-
 ```bash
 for i in {1..3}; do curl -s http://jujutsu.k40.com/api/; echo ""; done
 ```
 
-![Soal 18](screenshot/soal_18.png)
+**Hasil:**
+![Soal 18](images/soal_18.png)
 
 
 ## Soal 19 - Proxy Caching & Rate Limiting
@@ -1232,10 +1232,17 @@ chmod +x /root/soal_19.sh
 
 **Pengujian:**
 Dijalankan pada node **Client**:
-
 ```bash
 # Tes Cache (Perhatikan tulisan HIT/MISS pada X-Cache-Status)
 curl -i http://jujutsu.k40.com/ | grep X-Cache-Status
+
+# Tes Rate Limiting (Akan muncul response code 503 setelah melebihi batas)
+(for i in {1..15}; do curl -s -o /dev/null -w "%{http_code}\n" http://jujutsu.k40.com/api/ & done; wait)
+```
+
+**Hasil:**
+![Soal 19 Cache](images/soal_19_mh.png)
+![Soal 19 Rate Limiting](images/soal_19_rate.png)
 
 # Tes Rate Limiting (Akan muncul response code 503 setelah melebihi batas)
 (for i in {1..15}; do curl -s -o /dev/null -w "%{http_code}\n" http://jujutsu.k40.com/api/ & done; wait)
