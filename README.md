@@ -1240,10 +1240,3 @@ curl -i http://jujutsu.k40.com/ | grep X-Cache-Status
 **Hasil:**
 ![Soal 19 Cache](images/soal_19_mh.png)
 ![Soal 19 Rate Limiting](images/soal_19_rate.png)
-
-# Tes Rate Limiting (Akan muncul response code 503 setelah melebihi batas)
-(for i in {1..15}; do curl -s -o /dev/null -w "%{http_code}\n" http://jujutsu.k40.com/api/ & done; wait)
-```
-
-![Soal 19 MH](screenshot/soal_19_mh.png)
-![Soal 19 Rate](screenshot/soal_19_rate.png)
